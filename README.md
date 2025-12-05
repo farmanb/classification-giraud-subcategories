@@ -1,13 +1,3 @@
-# classification-giraud-subcategories
+# Classification of Giraud Subcategories
 
-## GitHub configuration
-
-To set up your new GitHub repository, follow these steps:
-
-* Under your repository name, click **Settings**.
-* In the **Actions** section of the sidebar, click "General".
-* Check the box **Allow GitHub Actions to create and approve pull requests**.
-* Click the **Pages** section of the settings sidebar.
-* In the **Source** dropdown menu, select "GitHub Actions".
-
-After following the steps above, you can remove this section from the README file.
+This project aims to formalize the one-to-one correspondence between equivalence classes of Giraud subcategories and topologies on a a ring `A`. This is Theorem 10.2 in Bo Stenström's *Rings and Modules of Quotients).
