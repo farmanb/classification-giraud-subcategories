@@ -56,6 +56,13 @@ structure IdealFilter (A : Type u) [Ring A] where
 namespace IdealFilter
 
 variable {A : Type u} [Ring A]
+
+@[ext]
+lemma ext {F G : IdealFilter A} (h : F.sets = G.sets) : F = G := by
+  cases F; cases G
+  cases h
+  simp
+
 --structure IsUniform {A : Type u} [Ring A] (F : IdealFilter A) : Prop where
 structure IsUniform (F : IdealFilter A) : Prop where
    (colon_closed : ∀ {I : Ideal A}, I ∈ F.sets →
@@ -375,7 +382,29 @@ def GabrielComposition (F G : IdealFilter A) : IdealFilter A where
 -- Declare notation for Gabriel composition
 infixl:70 " • " => GabrielComposition
 
-def IsGabrielFilter (F : IdealFilter A) : Prop :=
-  F.IsUniform ∧ F • F = F
+structure IsGabriel (F : IdealFilter A) extends IsUniform F where
+    gabriel_closed : ∀ (I : Ideal A), (∃ J ∈ F.sets, ∀ x ∈ J, I.colon (Ideal.span {x}) ∈ F.sets) →
+    I ∈ F.sets
 
+theorem isGabriel_iff (F : IdealFilter A) :
+    F.IsGabriel ↔ F.IsUniform ∧ F • F = F := by
+  constructor
+  · rintro ⟨h₁, h₂⟩
+    refine ⟨h₁, ?_⟩
+    ext I
+    constructor <;> intro h_I
+    · rcases h_I with ⟨J,h_J, h_tors⟩
+      unfold IsTorsionQuot at h_tors
+      refine h₂ I ⟨J, h_J, ?_⟩
+      intro x h_x
+      rcases h_tors x h_x with ⟨K, h_K, h_incl⟩
+      exact F.upward_closed h_K h_incl
+    · exact ⟨I, h_I, IsTorsionQuot_self F I⟩
+  · rintro ⟨h₁, h₂⟩
+    refine ⟨h₁, ?_⟩
+    rintro I ⟨J, h_J, h_colon⟩
+    rw[←h₂]
+    refine ⟨J, h_J,?_⟩
+    intro x h_x
+    exact ⟨I.colon (Ideal.span {x}), h_colon x h_x, by rfl⟩
 end IdealFilter
