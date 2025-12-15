@@ -264,43 +264,42 @@ This formulation avoids forming the quotient module explicitly. -/
 def IsTorsionQuot (F : IdealFilter A) (L K : Ideal A) : Prop :=
    ∀ k ∈ K, ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k})
 
-lemma colon_inf_eq_for_mem
-     (L K : Ideal A) {k : A} (hk : k ∈ K) :
-    (L ⊓ K).colon (Ideal.span ({k} : Set A)) =
-      L.colon (Ideal.span ({k} : Set A)) := by
+/-- If `k ∈ K`, then intersecting with `K` does not change the colon ideal. That is to say, there is
+an equality of colon ideals: `(L : k) = (L ⊓ K : k)`. -/
+lemma colon_inf_eq_for_mem (L K : Ideal A) {k : A} (h_k : k ∈ K) :
+    (L ⊓ K).colon (Ideal.span ({k} : Set A)) = L.colon (Ideal.span ({k} : Set A)) := by
   -- ext `a : A` and unpack `Submodule.mem_colon`
   ext a
-  constructor <;> intro ha
+  constructor <;> intro h_a
   · -- `a ∈ (L ⊓ K).colon(span{k})` ⇒ `a ∈ L.colon(span{k})`
     -- use Submodule.mem_colon to rewrite membership
-    rcases (Submodule.mem_colon).1 ha with h
+    rcases (Submodule.mem_colon).1 h_a with h
     -- need: ∀ p ∈ span{k}, a • p ∈ L
     apply (Submodule.mem_colon).2
-    intro p hp
+    intro p h_p
     -- p ∈ span{k} ⇒ p = r * k
-    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 hp
+    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 h_p
     -- from h we know: a • (r * k) ∈ L ⊓ K
     specialize h (r * k) ?_
-    · exact hp
-    · rcases h with ⟨hL, hK⟩
-      exact hL
+    · exact h_p
+    · rcases h with ⟨h_L, h_K⟩
+      exact h_L
   · -- same in the other direction, using that k ∈ K gives automatic K-membership
-    rcases (Submodule.mem_colon).1 ha with h
+    rcases (Submodule.mem_colon).1 h_a with h
     apply (Submodule.mem_colon).2
-    intro p hp
-    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 hp
+    intro p h_p
+    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 h_p
     -- a • (r * k) ∈ L by h
-    have hL : a • (r * k) ∈ L := by
-      apply h
-      exact hp
+    have h_L : a • (r * k) ∈ L := h (r*k) h_p
     -- and also a • (r * k) ∈ K because k ∈ K and K is an ideal
-    have hK : a • (r * k) ∈ K := by
+    have h_K : a • (r * k) ∈ K := by
       -- use closure of K under multiplication by scalars and membership of k
       -- this is just Ideal.mul_mem_left followed by ring simp
       simpa [mul_assoc, smul_mul_assoc] using
-        Ideal.mul_mem_left K a (Ideal.mul_mem_left K r hk)
-    exact ⟨hL, hK⟩
+        Ideal.mul_mem_left K a (Ideal.mul_mem_left K r h_k)
+    exact ⟨h_L, h_K⟩
 
+/-- Intersecting the left ideal with `K` does not change `IsTorsionQuot` on the right. -/
 @[simp]
 lemma IsTorsionQuot_inter_left_iff
      (F : IdealFilter A)
@@ -308,19 +307,19 @@ lemma IsTorsionQuot_inter_left_iff
     IsTorsionQuot F L K ↔ IsTorsionQuot F (L ⊓ K) K := by
   unfold IsTorsionQuot
   constructor
-  · intro h k hk
+  · intro h k h_k
     -- use the witness from `h`, then rewrite the colon using the lemma
-    rcases h k hk with ⟨I, hI, hI_le⟩
-    refine ⟨I, hI, ?_⟩
+    rcases h k h_k with ⟨I, h_I, h_I_le⟩
+    refine ⟨I, h_I, ?_⟩
     -- `I ≤ L.colon(span{k})` and those two colon ideals are equal
     · have hcol :=
-        colon_inf_eq_for_mem (L := L) (K := K) (k := k) hk
-      simpa [hcol] using hI_le
-  · intro h k hk
-    rcases h k hk with ⟨I, hI, hI_le⟩
-    refine ⟨I, hI, ?_⟩ -- now use equality in the opposite direction
-    · have hcol := colon_inf_eq_for_mem (L := L) (K := K) (k := k) hk
-      simpa [hcol] using hI_le
+        colon_inf_eq_for_mem (L := L) (K := K) (k := k) h_k
+      simpa [hcol] using h_I_le
+  · intro h k h_k
+    rcases h k h_k with ⟨I, h_I, h_I_le⟩
+    refine ⟨I, h_I, ?_⟩ -- now use equality in the opposite direction
+    · have hcol := colon_inf_eq_for_mem (L := L) (K := K) (k := k) h_k
+      simpa [hcol] using h_I_le
 
 @[simp] lemma IsTorsion_def (F : IdealFilter A)
       (M : Type v) [AddCommMonoid M] [Module A M] : IsTorsion F M ↔ ∀ m : M, IsTorsionElem F m :=
