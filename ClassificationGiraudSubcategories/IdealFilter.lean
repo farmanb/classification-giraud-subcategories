@@ -4,12 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Blake Farman
 -/
 import Mathlib.GroupTheory.Coset.Basic
+import Mathlib.Order.PFilter
 import Mathlib.RingTheory.Ideal.Basic
 import Mathlib.RingTheory.Ideal.Colon
 import Mathlib.Topology.Algebra.Group.Defs
 import Mathlib.Topology.Algebra.LinearTopology
 import Mathlib.Topology.Algebra.Monoid.Defs
 import Mathlib.Topology.Algebra.Ring.Basic
+import Mathlib.Topology.Algebra.FilterBasis
 import Mathlib.Tactic.Abel
 import Mathlib.Tactic.NoncommRing
 --import Mathlib.Topology.Defs.Filter
@@ -47,33 +49,28 @@ category theory, ideal, filter, ultrafilter, Gabriel filter
 -/
 universe u v
 
-structure IdealFilter (A : Type u) [Ring A] where
-  (sets : Set (Ideal A))
-  (nonempty : sets.Nonempty)
-  (upward_closed : ∀ {I J : Ideal A}, I ∈ sets → I ≤ J → J ∈ sets)
-  (inter_closed  : ∀ {I J : Ideal A}, I ∈ sets → J ∈ sets → I ⊓ J ∈ sets)
+abbrev IdealFilter (A : Type u) [Ring A] := Order.PFilter (Ideal A)
+
+--abbrev sets {A : Type u} [Ring A] (F : IdealFilter A) : Set (Ideal A) := F.carrier
+/- variable (A : Type u) [Ring A] (F : IdealFilter A)
+#check  -/
+
 
 namespace IdealFilter
 
 variable {A : Type u} [Ring A]
 
-@[ext]
-lemma ext {F G : IdealFilter A} (h : F.sets = G.sets) : F = G := by
-  cases F; cases G
-  cases h
-  simp
-
 --structure IsUniform {A : Type u} [Ring A] (F : IdealFilter A) : Prop where
 structure IsUniform (F : IdealFilter A) : Prop where
-   (colon_closed : ∀ {I : Ideal A}, I ∈ F.sets →
-      ∀ a : A, (I.colon (Ideal.span {a})) ∈ F.sets)
+   (colon_closed : ∀ {I : Ideal A}, I ∈ F →
+      ∀ a : A, (I.colon (Ideal.span {a})) ∈ F)
 
 /-- We say that an element `m : M` is `F`-torsion if it is annihilated by some ideal belonging to
-the filter `F`.  That is, there exists `L ∈ F.sets` such that every `a ∈ L` satisfies
+the filter `F`.  That is, there exists `L ∈ F` such that every `a ∈ L` satisfies
 `a • m = 0`. -/
 def IsTorsionElem (F : IdealFilter A)
       {M : Type v} [AddCommMonoid M] [Module A M] (m : M) : Prop :=
-   ∃ L ∈ F.sets, ∀ a ∈ L, a • m = 0
+   ∃ L ∈ F, ∀ a ∈ L, a • m = 0
 
 /-- We say that an `A`-module `M` is `F`-torsion if every element of `M` is `F`-torsion in the
 sense of `IsTorsionElem`. -/
@@ -82,11 +79,11 @@ def IsTorsion (F : IdealFilter A)
    ∀ m : M, IsTorsionElem F m
 
 /-- We say that the quotient `K/L` is `F`-torsion if every element `k ∈ K` is annihilated
-(modulo `L`) by some ideal in `F`.  Equivalently, for each `k ∈ K` there exists `I ∈ F.sets`
+(modulo `L`) by some ideal in `F`.  Equivalently, for each `k ∈ K` there exists `I ∈ F`
 such that `I ≤ L.colon (Ideal.span {k})`. That is to say, every `a ∈ I` satisfies `a * k ∈ L`.
 This formulation avoids forming the quotient module explicitly. -/
 def IsTorsionQuot (F : IdealFilter A) (L K : Ideal A) : Prop :=
-   ∀ k ∈ K, ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k})
+   ∀ k ∈ K, ∃ I ∈ F, I ≤ L.colon (Ideal.span {k})
 
 /-- If `k ∈ K`, then intersecting with `K` does not change the colon ideal. That is to say, there is
 an equality of colon ideals: `(L : k) = (L ⊓ K : k)`. -/
@@ -150,7 +147,7 @@ lemma IsTorsionQuot_inter_left_iff
   Iff.rfl
 
 @[simp] lemma IsTorsionQuot_def (F : IdealFilter A) (L K : Ideal A) :
-      IsTorsionQuot F L K ↔ ∀ k ∈ (K : Set A), ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k}) :=
+      IsTorsionQuot F L K ↔ ∀ k ∈ (K : Set A), ∃ I ∈ F, I ≤ L.colon (Ideal.span {k}) :=
   Iff.rfl
 
 /-- If `x ∈ I`, then the colon ideal `(x : I)` is the whole ring. -/
@@ -176,32 +173,35 @@ lemma IsTorsionQuot_mono_left (F : IdealFilter A)
   obtain ⟨L, ⟨L_in_F, h_L⟩⟩ := I_tors x h_x
   exact ⟨L, L_in_F, fun y h_y ⦃a⦄ a_1 ↦ I_leq_J (h_L h_y a_1)⟩
 
-def GabrielComposition (F G : IdealFilter A) : IdealFilter A where
-  sets := {L : Ideal A | ∃ K ∈ G.sets, F.IsTorsionQuot L K}
-  nonempty := by
-    obtain ⟨J,h_J⟩ := G.nonempty
-    exact ⟨J, J, h_J, IsTorsionQuot_self F J⟩
-  upward_closed := by
-    rintro I J ⟨K, h_KG, h_K⟩ h_IJ
-    exact ⟨K, h_KG, IsTorsionQuot_mono_left F h_IJ h_K⟩
-  inter_closed := by
-    rintro I J ⟨K,h_KG,h_K⟩ ⟨L,h_LG,h_L⟩
-    refine ⟨K ⊓ L, G.inter_closed h_KG h_LG, ?_⟩
-    · rintro x ⟨x_K, x_L⟩
-      obtain ⟨K₁, K₁_F, h_K₁⟩ := h_K x x_K
-      obtain ⟨K₂, K₂_F, h_K₂⟩ := h_L x x_L
-      refine ⟨K₁ ⊓ K₂, F.inter_closed K₁_F K₂_F, ?_⟩
-      · rintro y ⟨y_K₁, y_K₂⟩
-        have h₁ := Submodule.mem_colon.mp (h_K₁ y_K₁)
-        have h₂ := Submodule.mem_colon.mp (h_K₂ y_K₂)
-        exact Submodule.mem_colon.mpr (fun p h_p => ⟨h₁ p h_p, h₂ p h_p⟩)
+lemma isPFilter (F G : IdealFilter A) :
+    Order.IsPFilter {L : Ideal A | ∃ K ∈ G, F.IsTorsionQuot L K} := by
+    refine Order.IsPFilter.of_def ?nonempty ?directed ?mem_of_le
+    · obtain ⟨J,h_J⟩ := G.nonempty
+      exact ⟨J, J, h_J, IsTorsionQuot_self F J⟩
+    · rintro I ⟨K, h_K, h_IK⟩ J ⟨L, h_L, h_JL⟩
+      refine ⟨I ⊓ J, ?_, inf_le_left, inf_le_right⟩
+      · refine ⟨K ⊓ L, ?_, ?_⟩
+        · exact Order.PFilter.inf_mem h_K h_L
+        · rintro x h_x
+          rcases h_x with ⟨x_K, x_L⟩
+          obtain ⟨K₁, h_K₁F, h_K₁⟩ := h_IK x x_K
+          obtain ⟨K₂, h_K₂F, h_K₂⟩ := h_JL x x_L
+          refine ⟨K₁ ⊓ K₂, Order.PFilter.inf_mem h_K₁F h_K₂F, ?_⟩
+          rintro y ⟨h_y₁, h_y₂⟩
+          have h₁ := Submodule.mem_colon.mp (h_K₁ h_y₁)
+          have h₂ := Submodule.mem_colon.mp (h_K₂ h_y₂)
+          exact Submodule.mem_colon.mpr (fun p h_p => ⟨h₁ p h_p, h₂ p h_p⟩)
+    · intro I J h_IJ ⟨K, h_K, h_IK⟩
+      exact ⟨K, h_K, IsTorsionQuot_mono_left F h_IJ h_IK⟩
+
+def GabrielComposition (F G : IdealFilter A) : IdealFilter A := (isPFilter F G).toPFilter
 
 -- Declare notation for Gabriel composition
 infixl:70 " • " => GabrielComposition
 
 structure IsGabriel (F : IdealFilter A) extends IsUniform F where
-    gabriel_closed : ∀ (I : Ideal A), (∃ J ∈ F.sets, ∀ x ∈ J, I.colon (Ideal.span {x}) ∈ F.sets) →
-    I ∈ F.sets
+    gabriel_closed : ∀ (I : Ideal A), (∃ J ∈ F, ∀ x ∈ J, I.colon (Ideal.span {x}) ∈ F) →
+    I ∈ F
 
 theorem isGabriel_iff (F : IdealFilter A) :
     F.IsGabriel ↔ F.IsUniform ∧ F • F = F := by
@@ -215,7 +215,7 @@ theorem isGabriel_iff (F : IdealFilter A) :
       refine h₂ I ⟨J, h_J, ?_⟩
       intro x h_x
       rcases h_tors x h_x with ⟨K, h_K, h_incl⟩
-      exact F.upward_closed h_K h_incl
+      exact Order.PFilter.mem_of_le h_incl h_K
     · exact ⟨I, h_I, IsTorsionQuot_self F I⟩
   · rintro ⟨h₁, h₂⟩
     refine ⟨h₁, ?_⟩
@@ -225,28 +225,29 @@ theorem isGabriel_iff (F : IdealFilter A) :
     intro x h_x
     exact ⟨I.colon (Ideal.span {x}), h_colon x h_x, by rfl⟩
 
-section topology
+section Topology
 variable (F : IdealFilter A)
 
 def nhds_basis_of_IdealFilter (a : A) : FilterBasis A where
-  --sets := a +ᵥ {s | ∃ I ∈ F.sets, s = I.carrier}
-  sets := a +ᵥ {s | ∃ I ∈ F.sets, s = (I : Set A)}
+  --sets := a +ᵥ {s | ∃ I ∈ F, s = I.carrier}
+  --sets := a +ᵥ {s | ∃ I ∈ F, s = (I : Set A)}
+  sets := a +ᵥ {s | ∃ I ∈ F, s = (I : Set A)}
   nonempty := by
     obtain ⟨I, h_I⟩ := F.nonempty
     exact ⟨a +ᵥ (I : Set A), ⟨(I : Set A), ⟨I, h_I, rfl⟩, rfl⟩⟩
   inter_sets := by
     rintro s t ⟨s', ⟨I,h_I,rfl⟩, rfl⟩ ⟨t', ⟨J, h_J, rfl⟩, rfl⟩
     exact ⟨a +ᵥ ((I ⊓ J) : Set A),
-      ⟨((I ⊓ J) : Set A), ⟨I ⊓ J, F.inter_closed h_I h_J, rfl⟩, rfl⟩,
+      ⟨((I ⊓ J) : Set A),⟨I ⊓ J, Order.PFilter.inf_mem h_I h_J, rfl⟩, rfl⟩,
       by simp⟩
 
 def nhds_of_IdealFilter (a : A) : Filter A := FilterBasis.filter (nhds_basis_of_IdealFilter F a)
 
 /-- The topology on `A` induced by an ideal filter `F`.
 
-A subset `s : Set A` is declared open if for every `x ∈ s` there exists an ideal `I ∈ F.sets`
+A subset `s : Set A` is declared open if for every `x ∈ s` there exists an ideal `I ∈ F`
 such that the (left) coset `x +ᵥ I` is contained in `s`. Equivalently, the sets `x +ᵥ I` with
-`I ∈ F.sets` form a neighborhood basis at each point `x`.
+`I ∈ F` form a neighborhood basis at each point `x`.
 
 This is the standard way to build a (left) linear topology from a family of ideals, and it is
 the starting point for proving that additional hypotheses on `F` (e.g. uniformity) make `A` into
@@ -255,11 +256,11 @@ def topology_of_IdealFilter : TopologicalSpace A :=
   TopologicalSpace.mkOfNhds (nhds_of_IdealFilter F)
 
 /-- In the topology on `A` induced by an ideal filter `F`, every translate `x +ᵥ I` of an ideal
-`I ∈ F.sets` is an open neighborhood of `x`.
+`I ∈ F` is an open neighborhood of `x`.
 
 This is the basic “linear” feature of `topology_of_IdealFilter`: neighborhoods are generated by
 (translates of) ideals coming from the filter. -/
-lemma isOpen_leftAddCoset (x : A) {I : Ideal A} (h_I : I ∈ F.sets) :
+lemma isOpen_leftAddCoset (x : A) {I : Ideal A} (h_I : I ∈ F) :
       letI : TopologicalSpace A := topology_of_IdealFilter F
       IsOpen (x +ᵥ (I : Set A)) := by
   rintro y ⟨z, h_z : z ∈ I, h_sum : x + z = y⟩
@@ -283,9 +284,9 @@ lemma prod_leftAddCoset_subset_preimage_add
   abel
 
 /-- Membership in `nhds_of_IdealFilter F a` means that the set contains a basic coset neighborhood
-`a +ᵥ I` with `I ∈ F.sets`. -/
+`a +ᵥ I` with `I ∈ F`. -/
 lemma mem_nhds_of_IdealFilter_iff (a : A) (s : Set A) :
-    s ∈ nhds_of_IdealFilter F a ↔ ∃ I : Ideal A, I ∈ F.sets ∧ a +ᵥ (I : Set A) ⊆ s := by
+    s ∈ nhds_of_IdealFilter F a ↔ ∃ I : Ideal A, I ∈ F ∧ a +ᵥ (I : Set A) ⊆ s := by
   constructor
   · intro h_s
     rcases h_s with ⟨t,h_t,h_incl⟩
@@ -298,10 +299,10 @@ lemma mem_nhds_of_IdealFilter_iff (a : A) (s : Set A) :
     exact ⟨(I : Set A), ⟨I, h_I, rfl⟩, rfl⟩
 
 /-- In the topology `topology_of_IdealFilter F`, the neighborhood filter at `a` is exactly the
-filter `nhds_of_IdealFilter F a` generated by the basic cosets `a +ᵥ I` with `I ∈ F.sets`.
+filter `nhds_of_IdealFilter F a` generated by the basic cosets `a +ᵥ I` with `I ∈ F`.
 
 Equivalently, a set `n : Set A` is a neighborhood of `a` (i.e. `n ∈ 𝓝 a`) iff it contains some
-basic coset neighborhood `a +ᵥ I` with `I ∈ F.sets`. -/
+basic coset neighborhood `a +ᵥ I` with `I ∈ F`. -/
 @[simp]
 lemma nhds_eq_nhds_of_IdealFilter (a : A) :
     letI : TopologicalSpace A := topology_of_IdealFilter F
@@ -322,7 +323,7 @@ lemma nhds_eq_nhds_of_IdealFilter (a : A) :
 each of its points. -/
 lemma isOpen_iff_exists_leftAddCoset_subset (s : Set A) :
     letI : TopologicalSpace A := F.topology_of_IdealFilter
-    IsOpen s ↔ ∀ a ∈ s, ∃ I ∈ F.sets, a +ᵥ (I : Set A) ⊆ s := by
+    IsOpen s ↔ ∀ a ∈ s, ∃ I ∈ F, a +ᵥ (I : Set A) ⊆ s := by
   letI : TopologicalSpace A := F.topology_of_IdealFilter
   exact ⟨fun h_s a h_a => (mem_nhds_of_IdealFilter_iff F a s).mp (h_s a h_a),
     fun h a h_a => (mem_nhds_of_IdealFilter_iff F a s).mpr (h a h_a)⟩
@@ -331,7 +332,7 @@ lemma isOpen_iff_exists_leftAddCoset_subset (s : Set A) :
 ideal filter `F`.
 
 More precisely, with `TopologicalSpace A` given by `topology_of_IdealFilter F` (whose neighborhoods
-of a point `x` are generated by cosets `x +ᵥ I` for ideals `I ∈ F.sets`), both addition
+of a point `x` are generated by cosets `x +ᵥ I` for ideals `I ∈ F`), both addition
 `(fun p : A × A ↦ p.1 + p.2)` and negation `(fun x : A ↦ -x)` are continuous, yielding an
 `IsTopologicalAddGroup` instance. -/
 def isTopologicalAddGroup :
