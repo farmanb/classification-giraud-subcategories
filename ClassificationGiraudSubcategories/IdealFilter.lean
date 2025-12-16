@@ -68,6 +68,163 @@ structure IsUniform (F : IdealFilter A) : Prop where
    (colon_closed : ∀ {I : Ideal A}, I ∈ F.sets →
       ∀ a : A, (I.colon (Ideal.span {a})) ∈ F.sets)
 
+/-- We say that an element `m : M` is `F`-torsion if it is annihilated by some ideal belonging to
+the filter `F`.  That is, there exists `L ∈ F.sets` such that every `a ∈ L` satisfies
+`a • m = 0`. -/
+def IsTorsionElem (F : IdealFilter A)
+      {M : Type v} [AddCommMonoid M] [Module A M] (m : M) : Prop :=
+   ∃ L ∈ F.sets, ∀ a ∈ L, a • m = 0
+
+/-- We say that an `A`-module `M` is `F`-torsion if every element of `M` is `F`-torsion in the
+sense of `IsTorsionElem`. -/
+def IsTorsion (F : IdealFilter A)
+      (M : Type v) [AddCommMonoid M] [Module A M] : Prop :=
+   ∀ m : M, IsTorsionElem F m
+
+/-- We say that the quotient `K/L` is `F`-torsion if every element `k ∈ K` is annihilated
+(modulo `L`) by some ideal in `F`.  Equivalently, for each `k ∈ K` there exists `I ∈ F.sets`
+such that `I ≤ L.colon (Ideal.span {k})`. That is to say, every `a ∈ I` satisfies `a * k ∈ L`.
+This formulation avoids forming the quotient module explicitly. -/
+def IsTorsionQuot (F : IdealFilter A) (L K : Ideal A) : Prop :=
+   ∀ k ∈ K, ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k})
+
+/-- If `k ∈ K`, then intersecting with `K` does not change the colon ideal. That is to say, there is
+an equality of colon ideals: `(L : k) = (L ⊓ K : k)`. -/
+lemma colon_inf_eq_for_mem (L K : Ideal A) {k : A} (h_k : k ∈ K) :
+    (L ⊓ K).colon (Ideal.span ({k} : Set A)) = L.colon (Ideal.span ({k} : Set A)) := by
+  -- ext `a : A` and unpack `Submodule.mem_colon`
+  ext a
+  constructor <;> intro h_a
+  · -- `a ∈ (L ⊓ K).colon(span{k})` ⇒ `a ∈ L.colon(span{k})`
+    -- use Submodule.mem_colon to rewrite membership
+    rcases (Submodule.mem_colon).1 h_a with h
+    -- need: ∀ p ∈ span{k}, a • p ∈ L
+    apply (Submodule.mem_colon).2
+    intro p h_p
+    -- p ∈ span{k} ⇒ p = r * k
+    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 h_p
+    -- from h we know: a • (r * k) ∈ L ⊓ K
+    specialize h (r * k) ?_
+    · exact h_p
+    · rcases h with ⟨h_L, h_K⟩
+      exact h_L
+  · -- same in the other direction, using that k ∈ K gives automatic K-membership
+    rcases (Submodule.mem_colon).1 h_a with h
+    apply (Submodule.mem_colon).2
+    intro p h_p
+    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 h_p
+    -- a • (r * k) ∈ L by h
+    have h_L : a • (r * k) ∈ L := h (r*k) h_p
+    -- and also a • (r * k) ∈ K because k ∈ K and K is an ideal
+    have h_K : a • (r * k) ∈ K := by
+      -- use closure of K under multiplication by scalars and membership of k
+      -- this is just Ideal.mul_mem_left followed by ring simp
+      simpa [mul_assoc, smul_mul_assoc] using
+        Ideal.mul_mem_left K a (Ideal.mul_mem_left K r h_k)
+    exact ⟨h_L, h_K⟩
+
+/-- Intersecting the left ideal with `K` does not change `IsTorsionQuot` on the right. -/
+@[simp]
+lemma IsTorsionQuot_inter_left_iff
+     (F : IdealFilter A)
+    (L K : Ideal A) :
+    IsTorsionQuot F L K ↔ IsTorsionQuot F (L ⊓ K) K := by
+  unfold IsTorsionQuot
+  constructor
+  · intro h k h_k
+    -- use the witness from `h`, then rewrite the colon using the lemma
+    rcases h k h_k with ⟨I, h_I, h_I_le⟩
+    refine ⟨I, h_I, ?_⟩
+    -- `I ≤ L.colon(span{k})` and those two colon ideals are equal
+    · have hcol :=
+        colon_inf_eq_for_mem (L := L) (K := K) (k := k) h_k
+      simpa [hcol] using h_I_le
+  · intro h k h_k
+    rcases h k h_k with ⟨I, h_I, h_I_le⟩
+    refine ⟨I, h_I, ?_⟩ -- now use equality in the opposite direction
+    · have hcol := colon_inf_eq_for_mem (L := L) (K := K) (k := k) h_k
+      simpa [hcol] using h_I_le
+
+@[simp] lemma IsTorsion_def (F : IdealFilter A)
+      (M : Type v) [AddCommMonoid M] [Module A M] : IsTorsion F M ↔ ∀ m : M, IsTorsionElem F m :=
+  Iff.rfl
+
+@[simp] lemma IsTorsionQuot_def (F : IdealFilter A) (L K : Ideal A) :
+      IsTorsionQuot F L K ↔ ∀ k ∈ (K : Set A), ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k}) :=
+  Iff.rfl
+
+/-- If `x ∈ I`, then the colon ideal `(x : I)` is the whole ring. -/
+lemma colon_span_singleton_eq_top_of_mem {I : Ideal A} {x : A} (h_x : x ∈ I) :
+    I.colon (Ideal.span {x}) = ⊤ := by
+  apply (Ideal.eq_top_iff_one (I.colon (Ideal.span {x}))).mpr
+  apply Submodule.mem_colon.mpr
+  intro p h_p
+  obtain ⟨a,rfl⟩ := Ideal.mem_span_singleton'.mp h_p
+  simp only [one_smul,Ideal.mul_mem_left,h_x]
+
+/-- For any filter `F` and ideal `J`, the quotient `J/J` is `F`-torsion in the sense of
+`IsTorsionQuot`. -/
+lemma IsTorsionQuot_self (F : IdealFilter A) (I : Ideal A) :
+    IsTorsionQuot F I I := by
+  intro x h_x
+  obtain ⟨J, h_J⟩ := F.nonempty
+  exact ⟨J, h_J, by simp[colon_span_singleton_eq_top_of_mem h_x]⟩
+
+lemma IsTorsionQuot_mono_left (F : IdealFilter A)
+    {I J K : Ideal A} (I_leq_J : I ≤ J) : IsTorsionQuot F I K → IsTorsionQuot F J K := by
+  intro I_tors x h_x
+  obtain ⟨L, ⟨L_in_F, h_L⟩⟩ := I_tors x h_x
+  exact ⟨L, L_in_F, fun y h_y ⦃a⦄ a_1 ↦ I_leq_J (h_L h_y a_1)⟩
+
+def GabrielComposition (F G : IdealFilter A) : IdealFilter A where
+  sets := {L : Ideal A | ∃ K ∈ G.sets, F.IsTorsionQuot L K}
+  nonempty := by
+    obtain ⟨J,h_J⟩ := G.nonempty
+    exact ⟨J, J, h_J, IsTorsionQuot_self F J⟩
+  upward_closed := by
+    rintro I J ⟨K, h_KG, h_K⟩ h_IJ
+    exact ⟨K, h_KG, IsTorsionQuot_mono_left F h_IJ h_K⟩
+  inter_closed := by
+    rintro I J ⟨K,h_KG,h_K⟩ ⟨L,h_LG,h_L⟩
+    refine ⟨K ⊓ L, G.inter_closed h_KG h_LG, ?_⟩
+    · rintro x ⟨x_K, x_L⟩
+      obtain ⟨K₁, K₁_F, h_K₁⟩ := h_K x x_K
+      obtain ⟨K₂, K₂_F, h_K₂⟩ := h_L x x_L
+      refine ⟨K₁ ⊓ K₂, F.inter_closed K₁_F K₂_F, ?_⟩
+      · rintro y ⟨y_K₁, y_K₂⟩
+        have h₁ := Submodule.mem_colon.mp (h_K₁ y_K₁)
+        have h₂ := Submodule.mem_colon.mp (h_K₂ y_K₂)
+        exact Submodule.mem_colon.mpr (fun p h_p => ⟨h₁ p h_p, h₂ p h_p⟩)
+
+-- Declare notation for Gabriel composition
+infixl:70 " • " => GabrielComposition
+
+structure IsGabriel (F : IdealFilter A) extends IsUniform F where
+    gabriel_closed : ∀ (I : Ideal A), (∃ J ∈ F.sets, ∀ x ∈ J, I.colon (Ideal.span {x}) ∈ F.sets) →
+    I ∈ F.sets
+
+theorem isGabriel_iff (F : IdealFilter A) :
+    F.IsGabriel ↔ F.IsUniform ∧ F • F = F := by
+  constructor
+  · rintro ⟨h₁, h₂⟩
+    refine ⟨h₁, ?_⟩
+    ext I
+    constructor <;> intro h_I
+    · rcases h_I with ⟨J,h_J, h_tors⟩
+      unfold IsTorsionQuot at h_tors
+      refine h₂ I ⟨J, h_J, ?_⟩
+      intro x h_x
+      rcases h_tors x h_x with ⟨K, h_K, h_incl⟩
+      exact F.upward_closed h_K h_incl
+    · exact ⟨I, h_I, IsTorsionQuot_self F I⟩
+  · rintro ⟨h₁, h₂⟩
+    refine ⟨h₁, ?_⟩
+    rintro I ⟨J, h_J, h_colon⟩
+    rw[←h₂]
+    refine ⟨J, h_J,?_⟩
+    intro x h_x
+    exact ⟨I.colon (Ideal.span {x}), h_colon x h_x, by rfl⟩
+
 section topology
 variable (F : IdealFilter A)
 
@@ -250,161 +407,4 @@ def isTopologicalRing (uni_F : IsUniform F) :
 
 end topology
 
-
-/-- We say that an element `m : M` is `F`-torsion if it is annihilated by some ideal belonging to
-the filter `F`.  That is, there exists `L ∈ F.sets` such that every `a ∈ L` satisfies
-`a • m = 0`. -/
-def IsTorsionElem (F : IdealFilter A)
-      {M : Type v} [AddCommMonoid M] [Module A M] (m : M) : Prop :=
-   ∃ L ∈ F.sets, ∀ a ∈ L, a • m = 0
-
-/-- We say that an `A`-module `M` is `F`-torsion if every element of `M` is `F`-torsion in the
-sense of `IsTorsionElem`. -/
-def IsTorsion (F : IdealFilter A)
-      (M : Type v) [AddCommMonoid M] [Module A M] : Prop :=
-   ∀ m : M, IsTorsionElem F m
-
-/-- We say that the quotient `K/L` is `F`-torsion if every element `k ∈ K` is annihilated
-(modulo `L`) by some ideal in `F`.  Equivalently, for each `k ∈ K` there exists `I ∈ F.sets`
-such that `I ≤ L.colon (Ideal.span {k})`. That is to say, every `a ∈ I` satisfies `a * k ∈ L`.
-This formulation avoids forming the quotient module explicitly. -/
-def IsTorsionQuot (F : IdealFilter A) (L K : Ideal A) : Prop :=
-   ∀ k ∈ K, ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k})
-
-/-- If `k ∈ K`, then intersecting with `K` does not change the colon ideal. That is to say, there is
-an equality of colon ideals: `(L : k) = (L ⊓ K : k)`. -/
-lemma colon_inf_eq_for_mem (L K : Ideal A) {k : A} (h_k : k ∈ K) :
-    (L ⊓ K).colon (Ideal.span ({k} : Set A)) = L.colon (Ideal.span ({k} : Set A)) := by
-  -- ext `a : A` and unpack `Submodule.mem_colon`
-  ext a
-  constructor <;> intro h_a
-  · -- `a ∈ (L ⊓ K).colon(span{k})` ⇒ `a ∈ L.colon(span{k})`
-    -- use Submodule.mem_colon to rewrite membership
-    rcases (Submodule.mem_colon).1 h_a with h
-    -- need: ∀ p ∈ span{k}, a • p ∈ L
-    apply (Submodule.mem_colon).2
-    intro p h_p
-    -- p ∈ span{k} ⇒ p = r * k
-    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 h_p
-    -- from h we know: a • (r * k) ∈ L ⊓ K
-    specialize h (r * k) ?_
-    · exact h_p
-    · rcases h with ⟨h_L, h_K⟩
-      exact h_L
-  · -- same in the other direction, using that k ∈ K gives automatic K-membership
-    rcases (Submodule.mem_colon).1 h_a with h
-    apply (Submodule.mem_colon).2
-    intro p h_p
-    obtain ⟨r, rfl⟩ := Ideal.mem_span_singleton'.1 h_p
-    -- a • (r * k) ∈ L by h
-    have h_L : a • (r * k) ∈ L := h (r*k) h_p
-    -- and also a • (r * k) ∈ K because k ∈ K and K is an ideal
-    have h_K : a • (r * k) ∈ K := by
-      -- use closure of K under multiplication by scalars and membership of k
-      -- this is just Ideal.mul_mem_left followed by ring simp
-      simpa [mul_assoc, smul_mul_assoc] using
-        Ideal.mul_mem_left K a (Ideal.mul_mem_left K r h_k)
-    exact ⟨h_L, h_K⟩
-
-/-- Intersecting the left ideal with `K` does not change `IsTorsionQuot` on the right. -/
-@[simp]
-lemma IsTorsionQuot_inter_left_iff
-     (F : IdealFilter A)
-    (L K : Ideal A) :
-    IsTorsionQuot F L K ↔ IsTorsionQuot F (L ⊓ K) K := by
-  unfold IsTorsionQuot
-  constructor
-  · intro h k h_k
-    -- use the witness from `h`, then rewrite the colon using the lemma
-    rcases h k h_k with ⟨I, h_I, h_I_le⟩
-    refine ⟨I, h_I, ?_⟩
-    -- `I ≤ L.colon(span{k})` and those two colon ideals are equal
-    · have hcol :=
-        colon_inf_eq_for_mem (L := L) (K := K) (k := k) h_k
-      simpa [hcol] using h_I_le
-  · intro h k h_k
-    rcases h k h_k with ⟨I, h_I, h_I_le⟩
-    refine ⟨I, h_I, ?_⟩ -- now use equality in the opposite direction
-    · have hcol := colon_inf_eq_for_mem (L := L) (K := K) (k := k) h_k
-      simpa [hcol] using h_I_le
-
-@[simp] lemma IsTorsion_def (F : IdealFilter A)
-      (M : Type v) [AddCommMonoid M] [Module A M] : IsTorsion F M ↔ ∀ m : M, IsTorsionElem F m :=
-  Iff.rfl
-
-@[simp] lemma IsTorsionQuot_def (F : IdealFilter A) (L K : Ideal A) :
-      IsTorsionQuot F L K ↔ ∀ k ∈ (K : Set A), ∃ I ∈ F.sets, I ≤ L.colon (Ideal.span {k}) :=
-  Iff.rfl
-
-/-- If `x ∈ I`, then the colon ideal `(x : I)` is the whole ring. -/
-lemma colon_span_singleton_eq_top_of_mem {I : Ideal A} {x : A} (h_x : x ∈ I) :
-    I.colon (Ideal.span {x}) = ⊤ := by
-  apply (Ideal.eq_top_iff_one (I.colon (Ideal.span {x}))).mpr
-  apply Submodule.mem_colon.mpr
-  intro p h_p
-  obtain ⟨a,rfl⟩ := Ideal.mem_span_singleton'.mp h_p
-  simp only [one_smul,Ideal.mul_mem_left,h_x]
-
-/-- For any filter `F` and ideal `J`, the quotient `J/J` is `F`-torsion in the sense of
-`IsTorsionQuot`. -/
-lemma IsTorsionQuot_self (F : IdealFilter A) (I : Ideal A) :
-    IsTorsionQuot F I I := by
-  intro x h_x
-  obtain ⟨J, h_J⟩ := F.nonempty
-  exact ⟨J, h_J, by simp[colon_span_singleton_eq_top_of_mem h_x]⟩
-
-lemma IsTorsionQuot_mono_left (F : IdealFilter A)
-    {I J K : Ideal A} (I_leq_J : I ≤ J) : IsTorsionQuot F I K → IsTorsionQuot F J K := by
-  intro I_tors x h_x
-  obtain ⟨L, ⟨L_in_F, h_L⟩⟩ := I_tors x h_x
-  exact ⟨L, L_in_F, fun y h_y ⦃a⦄ a_1 ↦ I_leq_J (h_L h_y a_1)⟩
-
-def GabrielComposition (F G : IdealFilter A) : IdealFilter A where
-  sets := {L : Ideal A | ∃ K ∈ G.sets, F.IsTorsionQuot L K}
-  nonempty := by
-    obtain ⟨J,h_J⟩ := G.nonempty
-    exact ⟨J, J, h_J, IsTorsionQuot_self F J⟩
-  upward_closed := by
-    rintro I J ⟨K, h_KG, h_K⟩ h_IJ
-    exact ⟨K, h_KG, IsTorsionQuot_mono_left F h_IJ h_K⟩
-  inter_closed := by
-    rintro I J ⟨K,h_KG,h_K⟩ ⟨L,h_LG,h_L⟩
-    refine ⟨K ⊓ L, G.inter_closed h_KG h_LG, ?_⟩
-    · rintro x ⟨x_K, x_L⟩
-      obtain ⟨K₁, K₁_F, h_K₁⟩ := h_K x x_K
-      obtain ⟨K₂, K₂_F, h_K₂⟩ := h_L x x_L
-      refine ⟨K₁ ⊓ K₂, F.inter_closed K₁_F K₂_F, ?_⟩
-      · rintro y ⟨y_K₁, y_K₂⟩
-        have h₁ := Submodule.mem_colon.mp (h_K₁ y_K₁)
-        have h₂ := Submodule.mem_colon.mp (h_K₂ y_K₂)
-        exact Submodule.mem_colon.mpr (fun p h_p => ⟨h₁ p h_p, h₂ p h_p⟩)
-
--- Declare notation for Gabriel composition
-infixl:70 " • " => GabrielComposition
-
-structure IsGabriel (F : IdealFilter A) extends IsUniform F where
-    gabriel_closed : ∀ (I : Ideal A), (∃ J ∈ F.sets, ∀ x ∈ J, I.colon (Ideal.span {x}) ∈ F.sets) →
-    I ∈ F.sets
-
-theorem isGabriel_iff (F : IdealFilter A) :
-    F.IsGabriel ↔ F.IsUniform ∧ F • F = F := by
-  constructor
-  · rintro ⟨h₁, h₂⟩
-    refine ⟨h₁, ?_⟩
-    ext I
-    constructor <;> intro h_I
-    · rcases h_I with ⟨J,h_J, h_tors⟩
-      unfold IsTorsionQuot at h_tors
-      refine h₂ I ⟨J, h_J, ?_⟩
-      intro x h_x
-      rcases h_tors x h_x with ⟨K, h_K, h_incl⟩
-      exact F.upward_closed h_K h_incl
-    · exact ⟨I, h_I, IsTorsionQuot_self F I⟩
-  · rintro ⟨h₁, h₂⟩
-    refine ⟨h₁, ?_⟩
-    rintro I ⟨J, h_J, h_colon⟩
-    rw[←h₂]
-    refine ⟨J, h_J,?_⟩
-    intro x h_x
-    exact ⟨I.colon (Ideal.span {x}), h_colon x h_x, by rfl⟩
 end IdealFilter
