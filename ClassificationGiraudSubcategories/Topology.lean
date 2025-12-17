@@ -1,6 +1,7 @@
 import ClassificationGiraudSubcategories.Basic
 import Mathlib.Topology.Algebra.FilterBasis
 
+open scoped Pointwise
 open scoped Topology
 
 namespace IdealFilter
@@ -117,5 +118,4 @@ lemma isOpen_iff_exists_leftAddCoset_subset (s : Set A) :
     intro a h_a
     exact (F.mem_nhds_iff a s).2 (h a h_a)
 
-
-end Topology
+end IdealFilter
