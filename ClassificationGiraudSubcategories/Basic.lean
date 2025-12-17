@@ -254,5 +254,3 @@ theorem isGabriel_iff (F : IdealFilter A) : F.IsGabriel ↔ F.IsUniform ∧ F �
     intro x h_x
     refine ⟨I.colon (Ideal.span {x}), h_colon x h_x, by simp⟩
 end IdealFilter
-
-#lint
