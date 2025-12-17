@@ -41,7 +41,7 @@ An **ideal filter** is a filter in the lattice of ideals of a ring `A`.
 
 In the classical literature (e.g. Stenström), *linear topologies* on a ring are often described
 via filters of open ideals, and the terminology is frequently abused by identifying the topology
-with its filter of neighborhoods of zero.  More precisely, linear topologies are in bijective
+with its filter of ideals.  More precisely, linear topologies are in bijective
 correspondence with **uniform filters** of ideals.  The additional *Gabriel condition* (axiom T4)
 imposes an algebraic saturation property on such a filter, but does not change the induced
 topology.
