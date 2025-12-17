@@ -28,6 +28,18 @@ An **ideal filter** is a filter in the lattice of ideals of a ring `A`.
   for all `I : Ideal A`, if there exists `J ∈ F` such that for all `x ∈ J` the colon ideal
   `I.colon (Ideal.span {x})` is in `F`, then `I ∈ F`.
 
+## Conceptual Remarks
+
+In the classical literature (e.g. Stenström), *linear topologies* on a ring are often described
+via filters of open ideals, and the terminology is frequently abused by identifying the topology
+with its filter of neighborhoods of zero.  More precisely, linear topologies are in bijective
+correspondence with **uniform filters** of ideals.  The additional *Gabriel condition* (axiom T4)
+imposes an algebraic saturation property on such a filter, but does not change the induced
+topology.
+
+In this file we therefore keep these notions separate: a uniform filter determines a linear
+(additive) topology, while a Gabriel filter is a uniform filter satisfying T4.
+
 ## References
 
 * [Bo Stenström, Rings and Modules of Quotients][stenstrom1971]
