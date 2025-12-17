@@ -1,3 +1,2 @@
 import ClassificationGiraudSubcategories.Basic
-import ClassificationGiraudSubcategories.RightIdeal
-import ClassificationGiraudSubcategories.IdealFilter
+import ClassificationGiraudSubcategories.Topology
